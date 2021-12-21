@@ -1,1 +1,2 @@
 graft rp2biosensor/templates
+include LICENSE.md
