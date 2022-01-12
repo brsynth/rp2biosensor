@@ -268,7 +268,7 @@ class Transformation(object):
         rsmiles = right.split('.')
         return '.'.join(sorted(lsmiles)) + '>>' + '.'.join(sorted(rsmiles))
 
-    def __init__(self, row: dict, reverse: bool=True) -> Transformation:
+    def __init__(self, row: dict, reverse: bool=False) -> Transformation:
         """Build a Transformation object
 
         Parameters
