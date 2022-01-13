@@ -268,16 +268,13 @@ class Transformation(object):
         rsmiles = right.split('.')
         return '.'.join(sorted(lsmiles)) + '>>' + '.'.join(sorted(rsmiles))
 
-    def __init__(self, row: dict, reverse: bool=False) -> Transformation:
+    def __init__(self, row: dict) -> Transformation:
         """Build a Transformation object
 
         Parameters
         ----------
         row : dict
             dictionnary of rows as outputted by RetroPath2.0
-        reverse: bool, optional
-            True to consider the reaction is the reverse (right
-            to left) direction. Default to False.
 
         Returns
         -------
@@ -285,10 +282,7 @@ class Transformation(object):
             Transformation object
         """
         self.trs_id = row['Transformation ID']
-        if reverse:
-            rsmiles = Transformation.__reverse_reaction(row['Reaction SMILES'])
-        else:
-            rsmiles = row['Reaction SMILES']
+        rsmiles = row['Reaction SMILES']
         self.rxn_smiles = Transformation.__canonize_reaction_smiles(rsmiles)
         # Get involved compounds
         left_side, right_side = self.rxn_smiles.split('>>')
@@ -301,31 +295,8 @@ class Transformation(object):
         self.rule_score = row['Score']
         self.iteration = row['Iteration']
 
-    @staticmethod
-    def __reverse_reaction(rsmiles: str) -> str:
-        """Reverse the direction of a reaction SMILES
-
-        Parameters
-        ----------
-        rsmiles : str
-            reaction SMILES to be reversed
-
-        Returns
-        -------
-        str
-            reversed reaction SMILES
-        """
-        left, right = rsmiles.split('>>')
-        return f'{right}>>{left}'
-
-
-    def to_str(self, reverse=False) -> str:
+    def to_str(self) -> str:
         """Returns a string representation of the Transformation
-
-        Parameters
-        ----------
-        reverse : bool, optional
-            should the reaction considered in the reverse direction, by default False
 
         Returns
         -------
@@ -337,18 +308,11 @@ class Transformation(object):
         right_side = ':'.join(sorted([Transformation.cmpd_to_str(uid, coeff) for uid, coeff in self.right_uids.items()]))
         # ..
         ls = list()
-        if not reverse:
-            ls += [self.trs_id]  # Transformation ID
-            ls += [','.join(sorted(list(set(self.rule_ids))))]  # Rule IDs
-            ls += [left_side]
-            ls += ['=']
-            ls += [right_side]
-        else:
-            ls += [self.trs_id]  # Transformation ID
-            ls += [','.join(sorted(list(set(self.rule_ids))))]  # Rule IDs
-            ls += [right_side]
-            ls += ['=']
-            ls += [left_side]
+        ls += [self.trs_id]  # Transformation ID
+        ls += [','.join(sorted(list(set(self.rule_ids))))]  # Rule IDs
+        ls += [left_side]
+        ls += ['=']
+        ls += [right_side]
         return '\t'.join(ls)
 
 
