@@ -8,3 +8,4 @@ dependencies:
   - rdkit
   - pytest
   - rr_cache
+  - rxn_rebuild
