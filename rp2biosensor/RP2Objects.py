@@ -366,7 +366,7 @@ class Transformation(object):
                 # Parse the list of left and right compound IDs
                 left_str, right_str = rxn_info[tmpl_rxn_id]['full_transfo'].split('=')
                 trs_child.left_uids = cids_in_side(left_str)
-                trs_child.right_cids = cids_in_side(right_str)
+                trs_child.right_uids = cids_in_side(right_str)
                 
                 # Collect info on compounds not already known
                 new_cmpd_infos = {}
