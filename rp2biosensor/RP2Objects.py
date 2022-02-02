@@ -352,9 +352,17 @@ class Transformation(object):
 
                 # Info are stored in a new Transformation object
                 trs_child = copy.deepcopy(trs)
-                trs_child.trs_id = f'{trs_child.trs_id}_{tmpl_rxn_id}'
                 trs_child.rule_ids = [rule_id]
                 trs_child.template_rxn_ids = [tmpl_rxn_id]
+
+                # Make a new ID for the completed transformation
+                max_i = 9999
+                for i in range (max_i):
+                    _ = f'{trs.trs_id}_{tmpl_rxn_id}_{i}'
+                    if _ not in completed_transformations:
+                        trs_child.trs_id = _
+                    if i == max_i:
+                        raise AssertionError(f'Maximum number of child reached from transformation {trs}.')
 
                 # Get completion info
                 rxn_info = rebuild_rxn(
