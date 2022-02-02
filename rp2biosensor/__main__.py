@@ -18,7 +18,8 @@ TARGET_ID = 'TARGET_0000000001'  # Default target ID
 COFACTORS = [                    # Cofactor structures to be filtered
     'InChI=1S/O2/c1-2',  # O2
     'InChI=1S/H2O/h1H2',  # Water
-    'InChI=1S/p+1'  # H+
+    'InChI=1S/p+1',  # H+
+    'InChI=1S/CO2/c2-1-3',  # CO2
 ]
 
 
