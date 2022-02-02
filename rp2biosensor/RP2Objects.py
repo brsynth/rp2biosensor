@@ -751,7 +751,7 @@ class RetroGraph:
         sink_ids = self._get_sinks()
         cofactor_ids = self._get_nodes_matching_inchis(to_skip)
         nodes_to_keep = []
-        # undirected_network = self.__network.to_undirected()
+        edges_to_keep = []
         logging.info('Starting to prune network...')
         logging.info('Source to sink paths:')
         for sink_id in sink_ids:
@@ -763,13 +763,24 @@ class RetroGraph:
                         logging.info(f'|  |  |-> ACCEPTED')
                         for node_id in path:
                             nodes_to_keep.append(node_id)
+                        for i in range(len(path)-1):  # Keep only edge linkig to node of interest
+                            source_node = path[i]
+                            target_node = path[i+1]
+                            edges_to_keep.append((source_node, target_node))
                     else:
                         logging.info(f'|  |  |-> REJECTED')
             except nx.NetworkXNoPath:
                 pass
+        
+        # Only keep nodes of interest
         all_nodes = self.__network.nodes()
         nodes_to_remove = set(all_nodes) - set(nodes_to_keep)
         self.__network.remove_nodes_from(nodes_to_remove)
+
+        # Only keep edges of interest
+        all_edges = self.__network.edges()
+        edges_to_remove = set(all_edges) - set(edges_to_keep)
+        self.__network.remove_edges_from(edges_to_remove)
 
     def refine(self) -> None:
         """Generate SVG depictions, add template reaction IDs.
