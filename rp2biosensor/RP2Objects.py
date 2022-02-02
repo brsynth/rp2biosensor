@@ -352,6 +352,7 @@ class Transformation(object):
                 # Info are stored in a new Transformation object
                 trs_child = copy.deepcopy(trs)
                 trs_child.trs_id = f'{trs_child.trs_id}_{tmpl_rxn_id}'
+                trs_child.rule_ids = [rule_id]
                 trs_child.template_rxn_ids = [tmpl_rxn_id]
 
                 # Get completion info
