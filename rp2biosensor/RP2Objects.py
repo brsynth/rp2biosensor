@@ -215,17 +215,22 @@ class Compound(object):
         A special case is handle if the compound IDs are all using
         the "MNXM" prefix (coming from MetaNetX).
         """
-        # Check wether all IDs are coming from MetaNetX (MNXM prefix)
-        mnx_case = True
+        # If some IDs are coming from MetaNetX (MNXM prefix)
+        #   they are place in first positions
+        mnx_ids = []
+        other_ids = []
         for cid in cids:
-            if not cid.startswith('MNXM'):
-                mnx_case = False
-                break
-        # Sort IDs
-        if mnx_case:
-            return sorted(cids, key=lambda x: int(x[4:]))
-        else:
-            return sorted(cids)
+            if cid.startswith('MNXM'):
+                mnx_ids.append(cid)
+            else:
+                other_ids.append(cid)
+        
+        # Sort independantly each list
+        mnx_ids = sorted(mnx_ids, key=lambda x: int(x[4:]))
+        other_ids = sorted(other_ids)
+
+        # MNXM IDs are placed first
+        return mnx_ids + other_ids
 
     def set_uid(self, new_uid: str) -> None:
         """Change the value of the unique ID."""
