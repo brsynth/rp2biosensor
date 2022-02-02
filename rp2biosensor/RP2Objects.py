@@ -373,20 +373,16 @@ class Transformation(object):
                     if uid not in cls.compounds:
                         if uid in rxn_info[tmpl_rxn_id]['added_cmpds']['left']:
                             new_cmpd_infos[uid] = rxn_info[tmpl_rxn_id]['added_cmpds']['left'][uid]
-                            del(new_cmpd_infos[uid]['stoichio'])  # We don't care
                         elif uid in rxn_info[tmpl_rxn_id]['added_cmpds']['left_nostruct']:
                             new_cmpd_infos[uid] = rxn_info[tmpl_rxn_id]['added_cmpds']['left_nostruct'][uid]
-                            del(new_cmpd_infos[uid]['stoichio'])  # We don't care
                         else:
                             raise AssertionError(f'uid {uid} not in rxn_info')
                 for uid in set(trs_child.right_uids):
                     if uid not in cls.compounds:
                         if uid in rxn_info[tmpl_rxn_id]['added_cmpds']['right']:
                             new_cmpd_infos[uid] = rxn_info[tmpl_rxn_id]['added_cmpds']['right'][uid]
-                            del(new_cmpd_infos[uid]['stoichio'])  # We don't care
                         elif uid in rxn_info[tmpl_rxn_id]['added_cmpds']['right_nostruct']:
                             new_cmpd_infos[uid] = rxn_info[tmpl_rxn_id]['added_cmpds']['right_nostruct'][uid]
-                            del(new_cmpd_infos[uid]['stoichio'])  # We don't care
                         else:
                             raise AssertionError(f'uid {uid} not in rxn_info')
                 
