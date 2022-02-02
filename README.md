@@ -7,6 +7,8 @@ for more.
 
 In short, rp2bionsensor converts the output of [RetroPath2.0](https://www.myexperiment.org/workflows/4987.html) into a HTML page showing the possible metabolic paths linking the compound to be detected to the detectable ones.
 
+Notice: only the shortest paths are kept. This mean that if there is a 1 step path, no 2 steps will be outputted.
+
 ## Install
 
 ```bash
