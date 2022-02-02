@@ -257,6 +257,7 @@ class Transformation(object):
     #   and (ii) will be shared between all the instance objects of the class
     compounds = {}
     smiles_to_compound = {}
+    cache = None
 
     @classmethod
     def set_compounds(cls, compounds: dict, smiles_to_compound: dict) -> None:
@@ -367,6 +368,10 @@ class Transformation(object):
                 left_str, right_str = rxn_info[tmpl_rxn_id]['full_transfo'].split('=')
                 trs_child.left_uids = cids_in_side(left_str)
                 trs_child.right_uids = cids_in_side(right_str)
+
+                # DEBUG
+                left_uids_debug = trs_child.left_uids
+                right_uids_debug = trs_child.right_uids
                 
                 # Collect info on compounds not already known
                 new_cmpd_infos = {}
@@ -420,6 +425,15 @@ class Transformation(object):
                 trs_child.__set_reaction_smiles_from_compound_ids()
                 assert trs_child.trs_id not in completed_transformations
                 completed_transformations[trs_child.trs_id] = trs_child
+
+                # # DEBUG
+                # print(f"FULL TRANSFO: {rxn_info[tmpl_rxn_id]['full_transfo']}")
+                # print(f"TRS         : {trs_child.to_str()}")
+                # print(f"RULE ID     : {trs_child.rule_ids}")
+                # print(f"LEFT  BEFORE: {left_uids_debug}")
+                # print(f"LEFT  AFTER : {trs_child.left_uids}")
+                # print(f"RIGHT BEFORE: {right_uids_debug}")
+                # print(f"RIGHT AFTER : {trs_child.right_uids}")
 
         return completed_transformations
 
@@ -654,6 +668,10 @@ class RP2parser:
             completed_transformations = Transformation.complete_reactions(trs)
             transformations.update(completed_transformations)
         
+        # # DEBUG
+        # for cid, cmpd in compounds.items():
+        #     print(f"UID:  {cmpd.uid} -- {cmpd.smiles}")
+
         # Store compounds and transformations
         self.compounds = compounds
         self.transformations = transformations
@@ -814,7 +832,7 @@ class RetroGraph:
                 node['label'] = [transform.trs_id]
                 node['all_labels'] = [transform.trs_id]
             self.__network.add_nodes_from([(transform.trs_id, node)])
-            
+
             # Link to substrates and products
             for compound_uid, coeff in transform.left_uids.items():
                 self.__network.add_edge(
