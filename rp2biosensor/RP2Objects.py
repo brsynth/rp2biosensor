@@ -751,13 +751,13 @@ class RetroGraph:
         sink_ids = self._get_sinks()
         cofactor_ids = self._get_nodes_matching_inchis(to_skip)
         nodes_to_keep = []
-        undirected_network = self.__network.to_undirected()
+        # undirected_network = self.__network.to_undirected()
         logging.info('Starting to prune network...')
         logging.info('Source to sink paths:')
         for sink_id in sink_ids:
             logging.info(f'|- Sink ID: {sink_id}')
             try:
-                for path in nx.all_shortest_paths(undirected_network, sink_id, target_id):
+                for path in nx.all_shortest_paths(self.__network, target_id, sink_id):
                     logging.info(f'|  |- path: {path}')
                     if not bool(set(path) & set(cofactor_ids)):  #  bool(a & b) returns True if overlap exists
                         logging.info(f'|  |  |-> ACCEPTED')
