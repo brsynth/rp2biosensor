@@ -325,6 +325,7 @@ class Transformation(object):
             return items
         
         cache = cls.cache
+        cache_helper = CacheHelper(cls.cache)
 
         # Will store all the completed transformations
         completed_transformations = {}
@@ -344,7 +345,6 @@ class Transformation(object):
         for rule_id in trs.rule_ids:
 
             # Get template reaction associated to current rule ID
-            cache_helper = CacheHelper(cls.cache)
             template_rxn_ids = cache_helper.get_template_reactions(rule_id)
 
             # Iterate over template reactions
@@ -373,36 +373,32 @@ class Transformation(object):
                 left_uids_debug = trs_child.left_uids
                 right_uids_debug = trs_child.right_uids
                 
-                # Collect info on compounds not already known
-                new_cmpd_infos = {}
-                for uid in set(trs_child.left_uids):
-                    if uid not in cls.compounds:
-                        if uid in rxn_info[tmpl_rxn_id]['added_cmpds']['left']:
-                            new_cmpd_infos[uid] = rxn_info[tmpl_rxn_id]['added_cmpds']['left'][uid]
-                        elif uid in rxn_info[tmpl_rxn_id]['added_cmpds']['left_nostruct']:
-                            new_cmpd_infos[uid] = rxn_info[tmpl_rxn_id]['added_cmpds']['left_nostruct'][uid]
-                        else:
-                            raise AssertionError(f'uid {uid} not in rxn_info')
-                for uid in set(trs_child.right_uids):
-                    if uid not in cls.compounds:
-                        if uid in rxn_info[tmpl_rxn_id]['added_cmpds']['right']:
-                            new_cmpd_infos[uid] = rxn_info[tmpl_rxn_id]['added_cmpds']['right'][uid]
-                        elif uid in rxn_info[tmpl_rxn_id]['added_cmpds']['right_nostruct']:
-                            new_cmpd_infos[uid] = rxn_info[tmpl_rxn_id]['added_cmpds']['right_nostruct'][uid]
-                        else:
-                            raise AssertionError(f'uid {uid} not in rxn_info')
-                
-                # Check if these compounds are already known according to the SMILES
-                for uid, cmpd_info in new_cmpd_infos.items():
+                # Collect info on added compounds
+                reaction_cmpd_info = {}
+                for side in ('left', 'left_nostruct', 'right', 'right_nostruct'):
+                    for _key, _dict in rxn_info[tmpl_rxn_id]['added_cmpds'][side].items():
+                        reaction_cmpd_info[_dict['cid']] = _dict
+
+                # Check if these compounds are already known according to their SMILES
+                for uid, _dict_info in reaction_cmpd_info.items():
+                    
+                    # Skip if uid is already in the list of known compounds
+                    if uid in cls.compounds:
+                        continue
+
+                    # Try to produce a canonized SMILES
                     try:
-                        smi = canonize_smiles(cmpd_info['smiles'])
+                        smi = canonize_smiles(_dict_info['smiles'])
                     except KeyError:
                         smi = None
+                    
                     if smi is None:
                         # No way we got a match, we just add info on these compound
                         cls.compounds[uid] = Compound(smiles=None, uid=uid)
+                    
                     elif smi in cls.smiles_to_compound:
-                        # Here we have a match, we update the left / right list of IDs
+
+                        # Here we have a match, we replace and update the left / right list of IDs
                         ori_uid = cls.smiles_to_compound[smi]
                         if uid in trs_child.left_uids:
                             if ori_uid not in trs_child.left_uids:
@@ -414,13 +410,14 @@ class Transformation(object):
                                 trs_child.right_uids[ori_uid] = 0
                             trs_child.right_uids[ori_uid] += trs_child.right_uids[uid]
                             del(trs_child.right_uids[uid])
+                    
                     else:
                         # Otherwise this is a new compound
                         cmpd = Compound(smiles=smi, uid=uid)
                         cmpd.compute_structures()
                         cls.compounds[uid] = cmpd
                         cls.smiles_to_compound[smi] = uid
-
+                
                 # Now let's update the reaction SMILES
                 trs_child.__set_reaction_smiles_from_compound_ids()
                 assert trs_child.trs_id not in completed_transformations
