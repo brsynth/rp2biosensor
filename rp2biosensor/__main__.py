@@ -47,7 +47,7 @@ def run(args):
     # Extract and build graph
     rparser = RP2parser(args.rp2_results)
     rgraph = RetroGraph(rparser.compounds, rparser.transformations)
-    rgraph.keep_source_to_sink(to_skip=COFACTORS, target_id=TARGET_ID)
+    nb_paths = rgraph.keep_source_to_sink(to_skip=COFACTORS, target_id=TARGET_ID)
     rgraph.refine()
     # Write output
     json_str = rgraph.to_cytoscape_export()

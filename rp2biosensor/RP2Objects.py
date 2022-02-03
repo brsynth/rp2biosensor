@@ -734,7 +734,7 @@ class RetroGraph:
         self._add_transformations(transformations)
         self._make_edge_ids()
 
-    def keep_source_to_sink(self, to_skip: list(str)=[], target_id=[]) -> None:
+    def keep_source_to_sink(self, to_skip: list(str)=[], target_id=[]) -> int:
         """Keep only nodes and edges linking source to sinks
 
         Parameters
@@ -745,15 +745,24 @@ class RetroGraph:
             filter out cofactors. By default []
         target_id : str
             Target ID to consider as the target node, by default []
+        
+        Returns
+        -------
+            The number of kept source to sink paths
 
         If 'to_skip' structures as given then, those structures are skipped. 
         """
         sink_ids = self._get_sinks()
         cofactor_ids = self._get_nodes_matching_inchis(to_skip)
+        
         nodes_to_keep = []
         edges_to_keep = []
+        nb_paths = 0
+        
         logging.info('Starting to prune network...')
         logging.info('Source to sink paths:')
+
+
         for sink_id in sink_ids:
             logging.info(f'|- Sink ID: {sink_id}')
             try:
@@ -761,6 +770,7 @@ class RetroGraph:
                     logging.info(f'|  |- path: {path}')
                     if not bool(set(path) & set(cofactor_ids)):  #  bool(a & b) returns True if overlap exists
                         logging.info(f'|  |  |-> ACCEPTED')
+                        nb_paths += 0
                         for node_id in path:
                             nodes_to_keep.append(node_id)
                         for i in range(len(path)-1):  # Keep only edge linkig to node of interest
@@ -781,6 +791,9 @@ class RetroGraph:
         all_edges = self.__network.edges()
         edges_to_remove = set(all_edges) - set(edges_to_keep)
         self.__network.remove_edges_from(edges_to_remove)
+
+        # Number of kept paths
+        return nb_paths
 
     def refine(self) -> None:
         """Generate SVG depictions, add template reaction IDs.
