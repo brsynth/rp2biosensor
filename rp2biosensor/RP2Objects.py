@@ -1029,7 +1029,8 @@ class RetroGraph:
         for nid, node in self.__network.nodes(data=True):
             if (
                 'inchi' in node
-                and node['inchi'] in inchis
+                and node["inchi"] is not None
+                and any([inchi.startswith(node["inchi"]) for inchi in inchis])
                 and nid not in answer
             ):
                 answer.append(nid)
