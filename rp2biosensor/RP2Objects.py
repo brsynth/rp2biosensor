@@ -733,6 +733,7 @@ class RetroGraph:
         self._add_compounds(compounds)
         self._add_transformations(transformations)
         self._make_edge_ids()
+        self._merge_similar_reactions()
 
     def keep_source_to_sink(self, to_skip: list(str)=[], target_id=[]) -> int:
         """Keep only nodes and edges linking source to sinks
@@ -795,10 +796,111 @@ class RetroGraph:
         # Number of kept paths
         return nb_paths
 
-    def refine(self) -> None:
-        """Generate SVG depictions, add template reaction IDs.
+    def _merge_similar_reactions(self) -> None:
+        """Merge together reactions having similar information.
+        
+        Path sharing the following information are considered similar:
+            - reaction SMILES
+            - iteration
+        
+        The following rules are applied for the other values:
+            - EC numbers: union
+            - reaction template IDs: union
+            - rule score: best (the lower the better)
+            - rule IDs: union
+            - diameter: biggest
         """
-        self._add_svg_depiction()
+        # Collect ID of reactions
+        net = self.__network  # shorcut
+        rnodes_ids = []
+        for nid, data in net.nodes(data=True):
+            if data['type'] == 'reaction':
+                rnodes_ids.append(nid)
+
+        # Compare 2 by 2
+        to_merge = {}
+        for i in range(0, len(rnodes_ids)-1):
+            for j in range(i+1, len(rnodes_ids)):
+                inode = net.nodes[rnodes_ids[i]]
+                jnode = net.nodes[rnodes_ids[j]]
+                if (
+                    inode['rsmiles'] == jnode['rsmiles']
+                    and inode['iteration'] == jnode['iteration']
+                ):
+                    if inode['rsmiles'] not in to_merge:
+                        to_merge[inode['rsmiles']] = set()
+                    to_merge[inode['rsmiles']] |= set([inode['id'], jnode['id']])
+
+        # Merge
+        for smi, node_ids in to_merge.items():
+            ref_node_id = node_ids.pop()
+            for other_node_id in node_ids:
+                self.__merge_two_reaction_nodes(ref_node_id, other_node_id)
+                net.remove_node(other_node_id)
+
+    def __merge_two_reaction_nodes(self, ref_node_id: str, other_node_id: str):
+        """Merge information from one reaction to node into a reference node.
+
+        Information of the "other_node" are merge into the "ref_node". Nothing
+        is returned.
+
+        Parameters
+        ----------
+        ref_node_id : str
+            reference reaction node ID
+        other_node_id : [type]
+            other reaction node ID
+        """
+        n1 = self.__network.nodes[ref_node_id]
+        n2 = self.__network.nodes[other_node_id]
+
+        try:
+            n1['diameter'] = max(int(n1['diameter']), int(n2['diameter']))
+        except Exception as e:
+            logging.warning(e)
+
+        try:
+            n1['rule_ids'] = list(set(n1['rule_ids']) | set(n2['rule_ids']))
+        except Exception as e:
+            logging.warning(e)
+
+        try:
+            n1['rule_score'] = min(float(n1['rule_score']), float(n2['rule_score']))
+        except Exception as e:
+            logging.warning(e)
+        
+        try:
+            n1['ec_numbers'] = list(set(n1['ec_numbers']) | set(n2['ec_numbers']))
+        except Exception as e:
+            logging.warning(e)
+        
+        try:
+            n1['rxn_template_ids'] = list(set(n1['rxn_template_ids']) | set(n2['rxn_template_ids']))
+        except Exception as e:
+            logging.warning(e)
+
+    def _refine_reaction_labels(self):
+        """Build the reaction labels.
+
+        Reaction labels are made from EC numbers if any exist, otherwise
+        from the node id.
+        """
+        for nid, node in self.__network.nodes(data=True):
+            if node["type"] == "reaction":                
+                if len(node.get("ec_numbers", [])) > 0:
+                    node["label"] = node["ec_numbers"][0]
+                    node["all_labels"] = node["ec_numbers"]
+                else:
+                    node["label"] = nid
+                    node["all_labels"] = nid
+
+    def refine(self) -> None:
+        """Perform graph refinements.
+        
+        Merge similar reactions, SVG depictions, update reaction labels, ...
+        """
+        self._refine_svg_depictions()
+        self._refine_reaction_labels()
 
     def _add_compounds(self, compounds: dict) -> None:
         """Add compounds
@@ -852,14 +954,10 @@ class RetroGraph:
                 'rule_score': transform.rule_score,
                 'ec_numbers': transform.ec_numbers,
                 'iteration': transform.iteration,
-                'rxn_template_ids': sorted(list(set(transform.template_rxn_ids)))
+                'rxn_template_ids': sorted(list(set(transform.template_rxn_ids))),
+                "label" : "",
+                "all_labels" : []
             }
-            if len(transform.ec_numbers) > 0:
-                node['label'] = transform.ec_numbers[0]
-                node['all_labels'] = transform.ec_numbers
-            else:
-                node['label'] = [transform.trs_id]
-                node['all_labels'] = [transform.trs_id]
             self.__network.add_nodes_from([(transform.trs_id, node)])
 
             # Link to substrates and products
@@ -880,7 +978,7 @@ class RetroGraph:
         for source_id, target_id, edge_data in self.__network.edges(data=True):
             self.__network.edges[source_id, target_id]['id'] = source_id + '_=>_' + target_id
 
-    def _add_svg_depiction(self) -> None:
+    def _refine_svg_depictions(self) -> None:
         """Add SVG depiction of chemicals
         """
         for nid, node in self.__network.nodes(data=True):
@@ -929,9 +1027,11 @@ class RetroGraph:
         """
         answer = []
         for nid, node in self.__network.nodes(data=True):
-            if 'inchi' in node \
-                and node['inchi'] in inchis \
-                and nid not in answer:
+            if (
+                'inchi' in node
+                and node['inchi'] in inchis
+                and nid not in answer
+            ):
                 answer.append(nid)
         return answer
 
