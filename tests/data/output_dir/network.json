@@ -39,7 +39,7 @@ network = {
       },
       {
         "data": {
-          "id": "TRS_0_0_16_MNXR133653",
+          "id": "TRS_0_0_16_MNXR133653_9998",
           "type": "reaction",
           "rsmiles": "CC(O)C(=O)O.O=O>>CC(=O)C(=O)O.OO",
           "diameter": "12",
@@ -58,7 +58,7 @@ network = {
           "all_labels": [
             "1.1.3.15"
           ],
-          "value": "TRS_0_0_16_MNXR133653",
+          "value": "TRS_0_0_16_MNXR133653_9998",
           "name": "1.1.3.15"
         }
       }
@@ -67,16 +67,16 @@ network = {
       {
         "data": {
           "coeff": 1,
-          "id": "TARGET_0000000001_=>_TRS_0_0_16_MNXR133653",
+          "id": "TARGET_0000000001_=>_TRS_0_0_16_MNXR133653_9998",
           "source": "TARGET_0000000001",
-          "target": "TRS_0_0_16_MNXR133653"
+          "target": "TRS_0_0_16_MNXR133653_9998"
         }
       },
       {
         "data": {
           "coeff": 1,
-          "id": "TRS_0_0_16_MNXR133653_=>_CMPD_0000000013",
-          "source": "TRS_0_0_16_MNXR133653",
+          "id": "TRS_0_0_16_MNXR133653_9998_=>_CMPD_0000000013",
+          "source": "TRS_0_0_16_MNXR133653_9998",
           "target": "CMPD_0000000013"
         }
       }
