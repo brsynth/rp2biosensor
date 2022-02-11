@@ -102,6 +102,8 @@ class Compound(object):
         ----------
         smiles : str
             SMILES depiction
+        uid: str
+            Compound unique ID
 
         Returns
         -------

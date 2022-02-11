@@ -48,7 +48,7 @@ optional arguments:
 ## Example
 
 ```bash
-python -m rp2biosensor tests/data/input/rp2-results_dmax-16.csv --opath ./biosensor.html
+python -m rp2biosensor tests/data/input/rp2-results_lactate.csv --opath ./biosensor.html
 ```
 
 ## For developpers
@@ -64,6 +64,8 @@ conda develop -n rp2biosensor-dev .
 python -m pytest -vv
 ```
 
-## Licence
+## Authors
+- Thomas Duigou ([tduigou](https://github.com/tduigou))
 
+## Licence
 rp2biosensor is released under the MIT licence. See the [LICENSE.md](LICENSE.md) file for details.
