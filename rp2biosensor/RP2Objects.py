@@ -9,17 +9,38 @@ LICENSE.txt file.
 
 from __future__ import annotations
 
-import sys
+import copy
 import csv
 import json
-import urllib
 import logging
+import sys
+import urllib
 
 import networkx as nx
 from rdkit import Chem
-from rdkit.Chem.Draw import rdMolDraw2D
 from rdkit.Chem.AllChem import Compute2DCoords
-from rr_cache import rrCache 
+from rdkit.Chem.Draw import rdMolDraw2D
+from rr_cache import rrCache
+from rxn_rebuild import rebuild_rxn
+
+
+def canonize_smiles(smiles: str) -> str:
+    """Canonize a SMILES
+
+    Parameters
+    ----------
+    smiles : str
+        SMILES to be canonized
+
+    Returns
+    -------
+    str
+        SMILES
+    """
+    try:
+        return Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
+    except:
+        return smiles
 
 
 class IDsHandler:
@@ -74,35 +95,68 @@ class Compound(object):
         # Class attribute that handle the IDs of compounds
         cls.ids_handler = IDsHandler(length=10, prefix='CMPD')
 
-    def __init__(self, smiles: str) -> Compound:
+    def __init__(self, smiles: str = None, uid: str = None) -> Compound:
         """Build a Compound object
 
         Parameters
         ----------
         smiles : str
             SMILES depiction
+        uid: str
+            Compound unique ID
 
         Returns
         -------
         Compound
             a Compound object
         """
+
         self.cids = []
-        self.uid = self.ids_handler.make_new_id()
-        self.smiles = smiles
-        self.original_smiles = smiles
+
+        # Handle unique ID
+        if uid is None:
+            self.uid = self.ids_handler.make_new_id()
+        else:
+            self.uid = uid
+        
+        # Set SMILES if any provided
+        if smiles is not None:
+            self.smiles = smiles
+            self.original_smiles = smiles
+        else:
+            self.smiles = None
+            self.original_smiles = None
+        
+        # Other attributes
         self.inchi = None
         self.inchikey = None
         self.is_sink = False
         self.is_target = False
 
-    def recompute_structures(self) -> None:
+    def compute_structures(
+        self,
+        smiles: bool=True,
+        inchi: bool=True,
+        inchikey: bool=True
+        ) -> None:
         """Recompute SMILES, InChI and InChIKey of compounds
+
+        Parameters
+        ----------
+        smiles : bool
+            Compute smiles depiction, by default True
+        inchi: bool
+            Compute inchi depiction, by default True
+        inchikey: bool
+            Compute inchikey depiction, by default True
         """
         mol = Chem.MolFromSmiles(self.smiles)
-        self.smiles = Chem.MolToSmiles(mol)
-        self.inchi = Chem.MolToInchi(mol)
-        self.inchikey = Chem.MolToInchiKey(mol)
+        if smiles:
+            self.smiles = Chem.MolToSmiles(mol)
+        if inchi:
+            self.inchi = Chem.MolToInchi(mol)
+        if inchikey:
+            self.inchikey = Chem.MolToInchiKey(mol)
 
     def set_is_sink(self, is_sink: bool) -> None:
         """Set weither a compound is in sink
@@ -163,17 +217,22 @@ class Compound(object):
         A special case is handle if the compound IDs are all using
         the "MNXM" prefix (coming from MetaNetX).
         """
-        # Check wether all IDs are coming from MetaNetX (MNXM prefix)
-        mnx_case = True
+        # If some IDs are coming from MetaNetX (MNXM prefix)
+        #   they are place in first positions
+        mnx_ids = []
+        other_ids = []
         for cid in cids:
-            if not cid.startswith('MNXM'):
-                mnx_case = False
-                break
-        # Sort IDs
-        if mnx_case:
-            return sorted(cids, key=lambda x: int(x[4:]))
-        else:
-            return sorted(cids)
+            if cid.startswith('MNXM'):
+                mnx_ids.append(cid)
+            else:
+                other_ids.append(cid)
+        
+        # Sort independantly each list
+        mnx_ids = sorted(mnx_ids, key=lambda x: int(x[4:]))
+        other_ids = sorted(other_ids)
+
+        # MNXM IDs are placed first
+        return mnx_ids + other_ids
 
     def set_uid(self, new_uid: str) -> None:
         """Change the value of the unique ID."""
@@ -181,6 +240,16 @@ class Compound(object):
     
     def set_is_target(self, value: bool) -> None:
         self.is_target = value
+    
+    def get_smiles(self) -> str:
+        """Return the SMILES depiction
+
+        Returns
+        -------
+        str
+            SMILES
+        """
+        return self.smiles
 
 
 class Transformation(object):
@@ -190,6 +259,7 @@ class Transformation(object):
     #   and (ii) will be shared between all the instance objects of the class
     compounds = {}
     smiles_to_compound = {}
+    cache = None
 
     @classmethod
     def set_compounds(cls, compounds: dict, smiles_to_compound: dict) -> None:
@@ -204,6 +274,11 @@ class Transformation(object):
         """
         cls.compounds = compounds
         cls.smiles_to_compound = smiles_to_compound
+
+    @classmethod
+    def set_cache(cls) -> None:
+        """Set up the cache to be used for completing the reactions"""
+        cls.cache = rrCache()
 
     @classmethod
     def cmpd_to_str(cls, uid: str, coeff: int) -> str:
@@ -225,59 +300,199 @@ class Transformation(object):
         return str(coeff) + '.[' + ','.join(cids) + ']'
 
     @classmethod
-    def __compounds_in_reaction_side(cls, side_smiles: str) -> dict:
-        """Parse on side of a reaction SMILES outputted by RetroPath2.0
+    def complete_reactions(cls, trs: Transformation) -> list:
+        """Complete a Transformation
+
+        The Transformation is completed by adding the omitted cosubstrates
+        and cofactors. From a given uncompleted Transformation, several
+        completed Transformations could be outputted. This is the case if 
+        several couples of cofactors are possible, eg ATP/ADP or GTP/GDP.
 
         Parameters
         ----------
-        side_smiles : str
-            reaction SMILES of one side of the reaction
+        trs : Transformation
+            Transformation to be completed.
 
         Returns
         -------
-        dict
-            dictionnary of involved compounds {smiles: coeff}
+        list
+            List of completed Transformations.
         """
-        items = {}
-        for smi in side_smiles.split('.'):
-            uid = cls.smiles_to_compound[smi]
-            if uid not in items:
-                items[uid] = 0
-            items[uid] += 1
-        return items
+        def cids_in_side(side_str: str) -> dict:
+            items = {}
+            for cid in side_str.split('+'):
+                if cid not in items:
+                    items[cid] = 0
+                items[cid] += 1
+            return items
+        
+        cache = cls.cache
+        cache_helper = CacheHelper(cls.cache)
 
-    @staticmethod
-    def __canonize_reaction_smiles(rxn_smiles: str) -> str:
-        """Canonize a SMILES reaction.
+        # Will store all the completed transformations
+        completed_transformations = {}
+
+        # Build the ID based description of the reaction
+        transfo_str = ''
+        side = []
+        for cid, coeff in trs.left_uids.items():
+            side += [cid for _ in range(coeff)]
+        transfo_str = '+'.join(side)
+        side = []
+        for cid, coeff in trs.right_uids.items():
+            side += [cid for _ in range(coeff)]
+        transfo_str += '=' + '+'.join(side)
+
+        # Iterate over possible rule IDs
+        for rule_id in trs.rule_ids:
+
+            # Get template reaction associated to current rule ID
+            template_rxn_ids = cache_helper.get_template_reactions(rule_id)
+
+            # Iterate over template reactions
+            for tmpl_rxn_id in template_rxn_ids:
+
+                # Info are stored in a new Transformation object
+                trs_child = copy.deepcopy(trs)
+                trs_child.rule_ids = [rule_id]
+                trs_child.template_rxn_ids = [tmpl_rxn_id]
+
+                # Make a new ID for the completed transformation
+                max_i = 9999
+                for i in range (max_i):
+                    _ = f'{trs.trs_id}_{tmpl_rxn_id}_{i}'
+                    if _ not in completed_transformations:
+                        trs_child.trs_id = _
+                    if i == max_i:
+                        raise AssertionError(f'Maximum number of child reached from transformation {trs}.')
+
+                # Get completion info
+                rxn_info = rebuild_rxn(
+                    rxn_rule_id=rule_id,
+                    transfo=transfo_str,
+                    tmpl_rxn_id=tmpl_rxn_id,
+                    direction='reverse',
+                    cache=cache)
+
+                # Parse the list of left and right compound IDs
+                left_str, right_str = rxn_info[tmpl_rxn_id]['full_transfo'].split('=')
+                trs_child.left_uids = cids_in_side(left_str)
+                trs_child.right_uids = cids_in_side(right_str)
+
+                # DEBUG
+                left_uids_debug = trs_child.left_uids
+                right_uids_debug = trs_child.right_uids
+                
+                # Collect info on added compounds
+                reaction_cmpd_info = {}
+                for side in ('left', 'left_nostruct', 'right', 'right_nostruct'):
+                    for _key, _dict in rxn_info[tmpl_rxn_id]['added_cmpds'][side].items():
+                        reaction_cmpd_info[_dict['cid']] = _dict
+
+                # Check if these compounds are already known according to their SMILES
+                for uid, _dict_info in reaction_cmpd_info.items():
+                    
+                    # Skip if uid is already in the list of known compounds
+                    if uid in cls.compounds:
+                        continue
+
+                    # Try to produce a canonized SMILES
+                    try:
+                        smi = canonize_smiles(_dict_info['smiles'])
+                    except KeyError:
+                        smi = None
+                    
+                    if smi is None:
+                        # No way we got a match, we just add info on these compound
+                        cls.compounds[uid] = Compound(smiles=None, uid=uid)
+                    
+                    elif smi in cls.smiles_to_compound:
+
+                        # Here we have a match, we replace and update the left / right list of IDs
+                        ori_uid = cls.smiles_to_compound[smi]
+                        if uid in trs_child.left_uids:
+                            if ori_uid not in trs_child.left_uids:
+                                trs_child.left_uids[ori_uid] = 0
+                            trs_child.left_uids[ori_uid] += trs_child.left_uids[uid]
+                            del(trs_child.left_uids[uid])
+                        if uid in trs_child.right_uids:
+                            if ori_uid not in trs_child.right_uids:
+                                trs_child.right_uids[ori_uid] = 0
+                            trs_child.right_uids[ori_uid] += trs_child.right_uids[uid]
+                            del(trs_child.right_uids[uid])
+                    
+                    else:
+                        # Otherwise this is a new compound
+                        cmpd = Compound(smiles=smi, uid=uid)
+                        cmpd.compute_structures()
+                        cls.compounds[uid] = cmpd
+                        cls.smiles_to_compound[smi] = uid
+                
+                # Now let's update the reaction SMILES
+                trs_child.__set_reaction_smiles_from_compound_ids()
+                assert trs_child.trs_id not in completed_transformations
+                completed_transformations[trs_child.trs_id] = trs_child
+
+                # # DEBUG
+                # print(f"FULL TRANSFO: {rxn_info[tmpl_rxn_id]['full_transfo']}")
+                # print(f"TRS         : {trs_child.to_str()}")
+                # print(f"RULE ID     : {trs_child.rule_ids}")
+                # print(f"LEFT  BEFORE: {left_uids_debug}")
+                # print(f"LEFT  AFTER : {trs_child.left_uids}")
+                # print(f"RIGHT BEFORE: {right_uids_debug}")
+                # print(f"RIGHT AFTER : {trs_child.right_uids}")
+
+        return completed_transformations
+
+    def __set_compound_ids_from_reaction_smiles(self, rsmiles: str) -> int:
+        """Set the compound IDs from the reaction SMILES
 
         Parameters
         ----------
-        rxn_smiles : str
+        rsmiles : str
             reaction SMILES
 
         Returns
         -------
-        str
-            reaction SMILES with canonized SMILES compound order
-        
-        Canonization if performed by ordering compound SMILES in 
-        the alphabetical order.
+        int
+            the number of distinct compounds extracted
         """
-        left, right = rxn_smiles.split('>>')
-        lsmiles = left.split('.')
-        rsmiles = right.split('.')
-        return '.'.join(sorted(lsmiles)) + '>>' + '.'.join(sorted(rsmiles))
+        def cids_in_side(side_smiles: str) -> dict:
+            items = {}
+            for smi in side_smiles.split('.'):
+                uid = self.smiles_to_compound[canonize_smiles(smi)]
+                if uid not in items:
+                    items[uid] = 0
+                items[uid] += 1
+            return items
+        left_smiles, right_smiles = rsmiles.split('>>')
+        self.left_uids = cids_in_side(left_smiles)
+        self.right_uids = cids_in_side(right_smiles)
+        return len(set(self.left_uids) | set(self.right_uids))
 
-    def __init__(self, row: dict, reverse: bool=True) -> Transformation:
+    def __set_reaction_smiles_from_compound_ids(self) -> None:
+        """Build the reaction SMILES from compound IDs
+        """
+        def gen_smiles_side(compounds: dict) -> str:
+            side = []
+            for uid, coeff in compounds.items():
+                if uid in self.compounds and self.compounds[uid].get_smiles() is not None:
+                    side += [self.compounds[uid].get_smiles() for _ in range(coeff)]
+                else:
+                    pass
+            return '.'.join(sorted(side))
+        self.rxn_smiles = '>>'.join([
+            gen_smiles_side(self.left_uids),
+            gen_smiles_side(self.right_uids)
+            ])
+
+    def __init__(self, row: dict) -> Transformation:
         """Build a Transformation object
 
         Parameters
         ----------
         row : dict
             dictionnary of rows as outputted by RetroPath2.0
-        reverse: bool, optional
-            True to consider the reaction is the reverse (right
-            to left) direction. Default to False.
 
         Returns
         -------
@@ -285,47 +500,25 @@ class Transformation(object):
             Transformation object
         """
         self.trs_id = row['Transformation ID']
-        if reverse:
-            rsmiles = Transformation.__reverse_reaction(row['Reaction SMILES'])
-        else:
-            rsmiles = row['Reaction SMILES']
-        self.rxn_smiles = Transformation.__canonize_reaction_smiles(rsmiles)
-        # Get involved compounds
-        left_side, right_side = self.rxn_smiles.split('>>')
-        self.left_uids = Transformation.__compounds_in_reaction_side(left_side)
-        self.right_uids = Transformation.__compounds_in_reaction_side(right_side)
-        # ..
         self.diameter = row['Diameter']
         self.rule_ids = row['Rule ID'].lstrip('[').rstrip(']').split(', ')
         self.ec_numbers = row['EC number'].lstrip('[').rstrip(']').split(', ')
         self.rule_score = row['Score']
         self.iteration = row['Iteration']
 
-    @staticmethod
-    def __reverse_reaction(rsmiles: str) -> str:
-        """Reverse the direction of a reaction SMILES
+        # To be filled later
+        self.left_uids = {}
+        self.right_uids = {}
+        self.rxn_smiles = ''
 
-        Parameters
-        ----------
-        rsmiles : str
-            reaction SMILES to be reversed
+        # Get involved compounds from SMILES
+        self.__set_compound_ids_from_reaction_smiles(row['Reaction SMILES'])
 
-        Returns
-        -------
-        str
-            reversed reaction SMILES
-        """
-        left, right = rsmiles.split('>>')
-        return f'{right}>>{left}'
+        # Re-build reaction SMILES from UIDS
+        self.__set_reaction_smiles_from_compound_ids()
 
-
-    def to_str(self, reverse=False) -> str:
+    def to_str(self) -> str:
         """Returns a string representation of the Transformation
-
-        Parameters
-        ----------
-        reverse : bool, optional
-            should the reaction considered in the reverse direction, by default False
 
         Returns
         -------
@@ -337,18 +530,11 @@ class Transformation(object):
         right_side = ':'.join(sorted([Transformation.cmpd_to_str(uid, coeff) for uid, coeff in self.right_uids.items()]))
         # ..
         ls = list()
-        if not reverse:
-            ls += [self.trs_id]  # Transformation ID
-            ls += [','.join(sorted(list(set(self.rule_ids))))]  # Rule IDs
-            ls += [left_side]
-            ls += ['=']
-            ls += [right_side]
-        else:
-            ls += [self.trs_id]  # Transformation ID
-            ls += [','.join(sorted(list(set(self.rule_ids))))]  # Rule IDs
-            ls += [right_side]
-            ls += ['=']
-            ls += [left_side]
+        ls += [self.trs_id]  # Transformation ID
+        ls += [','.join(sorted(list(set(self.rule_ids))))]  # Rule IDs
+        ls += [left_side]
+        ls += ['=']
+        ls += [right_side]
         return '\t'.join(ls)
 
 
@@ -439,10 +625,13 @@ class RP2parser:
                 sys.exit(0)
             # Populate
             for smi in sorted(list(left_cmpds_from_rxn | right_cmpds_from_rxn)):
-                if smi not in smiles_to_compound.keys():
-                    cmpd = Compound(smi)
+                # Get canonize version of SMILES
+                can_smi = canonize_smiles(smi)
+                if can_smi not in smiles_to_compound.keys():
+                    cmpd = Compound(can_smi)
+                    cmpd.compute_structures(smiles=False)
                     compounds[cmpd.uid] = cmpd
-                    smiles_to_compound[smi] = cmpd.uid
+                    smiles_to_compound[can_smi] = cmpd.uid
 
         # 3) Annotate sink
         for tid, rows in content.items():
@@ -450,7 +639,8 @@ class RP2parser:
                 if row['In Sink'] == '1':
                     cids = row['Sink name'].lstrip('[').rstrip(']').split(', ')
                     smi = row['Product SMILES']
-                    uid = smiles_to_compound[smi]
+                    can_smi = canonize_smiles(smi)
+                    uid = smiles_to_compound[can_smi]
                     cmpd = compounds[uid]
                     for cid in cids:
                         compounds[cmpd.uid].add_cid(cid)
@@ -462,29 +652,32 @@ class RP2parser:
         for tid, rows in content.items():
             if rows[0]['Iteration'] == '0':
                 smi = rows[0]['Substrate SMILES']
-                old_uid = smiles_to_compound[smi]
+                can_smi = canonize_smiles(smi)
+                old_uid = smiles_to_compound[can_smi]
                 if old_uid not in target_visited:
                     target_uid = target_ids_handler.make_new_id()
                     target_visited.add(target_uid)
-                    smiles_to_compound[smi] = target_uid
+                    smiles_to_compound[can_smi] = target_uid
                     cmpd = compounds.pop(old_uid)
                     cmpd.set_uid(target_uid)
                     cmpd.set_is_target(True)
                     compounds[target_uid] = cmpd
         
-        # 5) Make accessible compounds information from Transformation objects
+        # 5) Make accessible compounds and cache information from Transformation objects
         Transformation.set_compounds(compounds, smiles_to_compound)
+        Transformation.set_cache()
 
         # 6) Populate transformations
         transformations = dict()
         for tid, rows in content.items():
             trs = Transformation(rows[0])
-            transformations[tid] = trs
+            # Complete transformatoins
+            completed_transformations = Transformation.complete_reactions(trs)
+            transformations.update(completed_transformations)
         
-        # 7) Refine structures !! Should be done after transformations
-        #    because transformation is based on reaction SMILES
-        for cmpd in compounds.values():
-            cmpd.recompute_structures()
+        # # DEBUG
+        # for cid, cmpd in compounds.items():
+        #     print(f"UID:  {cmpd.uid} -- {cmpd.smiles}")
 
         # Store compounds and transformations
         self.compounds = compounds
@@ -495,12 +688,15 @@ class CacheHelper:
     """Helper to use cached info
     """
 
-    def __init__(self):
+    def __init__(self, cache=None) -> CacheHelper:
         """Helper to use cached info
         """
-        self.cache = rrCache(['rr_reactions'])
+        if cache is None:
+            self.cache = rrCache(['rr_reactions'])
+        else:
+            self.cache = cache
     
-    def get_template_reaction(self, rule_id: str) -> list(str):
+    def get_template_reactions(self, rule_id: str) -> list(str):
         """Get template reaction IDs associated to a given reaction rule
 
         Parameters
@@ -512,7 +708,6 @@ class CacheHelper:
         -------
         list(str):
             list of reaction template IDs
-            
         """
         return [rid for rid in self.cache.get_reaction_rule(rule_id)]
 
@@ -540,8 +735,9 @@ class RetroGraph:
         self._add_compounds(compounds)
         self._add_transformations(transformations)
         self._make_edge_ids()
-    
-    def keep_source_to_sink(self, to_skip: list(str)=[], target_id=[]) -> None:
+        self._merge_similar_reactions()
+
+    def keep_source_to_sink(self, to_skip: list(str)=[], target_id=[]) -> int:
         """Keep only nodes and edges linking source to sinks
 
         Parameters
@@ -552,37 +748,161 @@ class RetroGraph:
             filter out cofactors. By default []
         target_id : str
             Target ID to consider as the target node, by default []
+        
+        Returns
+        -------
+            The number of kept source to sink paths
 
-        If structure structures as given then, those structure are skipped. 
+        If 'to_skip' structures as given then, those structures are skipped. 
         """
         sink_ids = self._get_sinks()
         cofactor_ids = self._get_nodes_matching_inchis(to_skip)
+        
         nodes_to_keep = []
-        undirected_network = self.__network.to_undirected()
+        edges_to_keep = []
+        nb_paths = 0
+        
         logging.info('Starting to prune network...')
         logging.info('Source to sink paths:')
+
+
         for sink_id in sink_ids:
             logging.info(f'|- Sink ID: {sink_id}')
             try:
-                for path in nx.all_shortest_paths(undirected_network, sink_id, target_id):
+                for path in nx.all_shortest_paths(self.__network, target_id, sink_id):
                     logging.info(f'|  |- path: {path}')
                     if not bool(set(path) & set(cofactor_ids)):  #  bool(a & b) returns True if overlap exists
                         logging.info(f'|  |  |-> ACCEPTED')
+                        nb_paths += 0
                         for node_id in path:
                             nodes_to_keep.append(node_id)
+                        for i in range(len(path)-1):  # Keep only edge linkig to node of interest
+                            source_node = path[i]
+                            target_node = path[i+1]
+                            edges_to_keep.append((source_node, target_node))
                     else:
                         logging.info(f'|  |  |-> REJECTED')
             except nx.NetworkXNoPath:
                 pass
+        
+        # Only keep nodes of interest
         all_nodes = self.__network.nodes()
         nodes_to_remove = set(all_nodes) - set(nodes_to_keep)
         self.__network.remove_nodes_from(nodes_to_remove)
 
-    def refine(self) -> None:
-        """Generate SVG depictions, add template reaction IDs.
+        # Only keep edges of interest
+        all_edges = self.__network.edges()
+        edges_to_remove = set(all_edges) - set(edges_to_keep)
+        self.__network.remove_edges_from(edges_to_remove)
+
+        # Number of kept paths
+        return nb_paths
+
+    def _merge_similar_reactions(self) -> None:
+        """Merge together reactions having similar information.
+        
+        Path sharing the following information are considered similar:
+            - reaction SMILES
+            - iteration
+        
+        The following rules are applied for the other values:
+            - EC numbers: union
+            - reaction template IDs: union
+            - rule score: best (the lower the better)
+            - rule IDs: union
+            - diameter: biggest
         """
-        self._add_svg_depiction()
-        self._add_template_rxn_ids()
+        # Collect ID of reactions
+        net = self.__network  # shorcut
+        rnodes_ids = []
+        for nid, data in net.nodes(data=True):
+            if data['type'] == 'reaction':
+                rnodes_ids.append(nid)
+
+        # Compare 2 by 2
+        to_merge = {}
+        for i in range(0, len(rnodes_ids)-1):
+            for j in range(i+1, len(rnodes_ids)):
+                inode = net.nodes[rnodes_ids[i]]
+                jnode = net.nodes[rnodes_ids[j]]
+                if (
+                    inode['rsmiles'] == jnode['rsmiles']
+                    and inode['iteration'] == jnode['iteration']
+                ):
+                    if inode['rsmiles'] not in to_merge:
+                        to_merge[inode['rsmiles']] = set()
+                    to_merge[inode['rsmiles']] |= set([inode['id'], jnode['id']])
+
+        # Merge
+        for smi, node_ids in to_merge.items():
+            ref_node_id = node_ids.pop()
+            for other_node_id in node_ids:
+                self.__merge_two_reaction_nodes(ref_node_id, other_node_id)
+                net.remove_node(other_node_id)
+
+    def __merge_two_reaction_nodes(self, ref_node_id: str, other_node_id: str):
+        """Merge information from one reaction to node into a reference node.
+
+        Information of the "other_node" are merge into the "ref_node". Nothing
+        is returned.
+
+        Parameters
+        ----------
+        ref_node_id : str
+            reference reaction node ID
+        other_node_id : [type]
+            other reaction node ID
+        """
+        n1 = self.__network.nodes[ref_node_id]
+        n2 = self.__network.nodes[other_node_id]
+
+        try:
+            n1['diameter'] = max(int(n1['diameter']), int(n2['diameter']))
+        except Exception as e:
+            logging.warning(e)
+
+        try:
+            n1['rule_ids'] = list(set(n1['rule_ids']) | set(n2['rule_ids']))
+        except Exception as e:
+            logging.warning(e)
+
+        try:
+            n1['rule_score'] = min(float(n1['rule_score']), float(n2['rule_score']))
+        except Exception as e:
+            logging.warning(e)
+        
+        try:
+            n1['ec_numbers'] = list(set(n1['ec_numbers']) | set(n2['ec_numbers']))
+        except Exception as e:
+            logging.warning(e)
+        
+        try:
+            n1['rxn_template_ids'] = list(set(n1['rxn_template_ids']) | set(n2['rxn_template_ids']))
+        except Exception as e:
+            logging.warning(e)
+
+    def _refine_reaction_labels(self):
+        """Build the reaction labels.
+
+        Reaction labels are made from EC numbers if any exist, otherwise
+        from the node id.
+        """
+        for nid, node in self.__network.nodes(data=True):
+            if node["type"] == "reaction":                
+                if len(node.get("ec_numbers", [])) > 0:
+                    node["label"] = node["ec_numbers"][0]
+                    node["all_labels"] = node["ec_numbers"]
+                else:
+                    node["label"] = nid
+                    node["all_labels"] = nid
+
+    def refine(self) -> None:
+        """Perform graph refinements.
+        
+        Merge similar reactions, SVG depictions, update reaction labels, ...
+        """
+        self._refine_svg_depictions()
+        self._refine_reaction_labels()
 
     def _add_compounds(self, compounds: dict) -> None:
         """Add compounds
@@ -625,6 +945,7 @@ class RetroGraph:
                 transformations.values(),
                 key=lambda x: x.trs_id
             ):
+
             # Store the reaction itself
             node = {
                 'id': transform.trs_id,
@@ -634,15 +955,13 @@ class RetroGraph:
                 'rule_ids': transform.rule_ids,
                 'rule_score': transform.rule_score,
                 'ec_numbers': transform.ec_numbers,
-                'iteration': transform.iteration
+                'iteration': transform.iteration,
+                'rxn_template_ids': sorted(list(set(transform.template_rxn_ids))),
+                "label" : "",
+                "all_labels" : []
             }
-            if len(transform.ec_numbers) > 0:
-                node['label'] = transform.ec_numbers[0]
-                node['all_labels'] = transform.ec_numbers
-            else:
-                node['label'] = [transform.trs_id]
-                node['all_labels'] = [transform.trs_id]
             self.__network.add_nodes_from([(transform.trs_id, node)])
+
             # Link to substrates and products
             for compound_uid, coeff in transform.left_uids.items():
                 self.__network.add_edge(
@@ -661,7 +980,7 @@ class RetroGraph:
         for source_id, target_id, edge_data in self.__network.edges(data=True):
             self.__network.edges[source_id, target_id]['id'] = source_id + '_=>_' + target_id
 
-    def _add_svg_depiction(self) -> None:
+    def _refine_svg_depictions(self) -> None:
         """Add SVG depiction of chemicals
         """
         for nid, node in self.__network.nodes(data=True):
@@ -680,18 +999,7 @@ class RetroGraph:
                     msg = f"SVG depiction failed from inchi: {node['inchi']}"
                     logging.warning(msg)
                     raise e
-    
-    def _add_template_rxn_ids(self) -> None:
-        """Add template reaction IDs according to rule IDs
-        """
-        cache_helper = CacheHelper()
-        for nid, node in self.__network.nodes(data=True):
-            if node['type'] == 'reaction':
-                reaction_ids = []
-                for rule_id in node['rule_ids']:
-                    reaction_ids += cache_helper.get_template_reaction(rule_id)
-                node['rxn_template_ids'] = sorted(list(set(reaction_ids)))
-    
+        
     def _get_sinks(self) -> list(str):
         """Get the list of sink compounds
 
@@ -721,9 +1029,12 @@ class RetroGraph:
         """
         answer = []
         for nid, node in self.__network.nodes(data=True):
-            if 'inchi' in node \
-                and node['inchi'] in inchis \
-                and nid not in answer:
+            if (
+                'inchi' in node
+                and node["inchi"] is not None
+                and any([inchi.startswith(node["inchi"]) for inchi in inchis])
+                and nid not in answer
+            ):
                 answer.append(nid)
         return answer
 

@@ -3,7 +3,7 @@ from pathlib import Path
 from filecmp import cmpfiles
 from rp2biosensor.__main__ import run
 
-INPUT_PATH = Path(__file__).resolve().parent/ 'data' / 'input' / 'rp2-results_dmax-16.csv'
+INPUT_PATH = Path(__file__).resolve().parent/ 'data' / 'input' / 'rp2-results-lactate.csv'
 OUTPUT_DIR_PATH = Path(__file__).resolve().parent / 'data' / 'output_dir'
 OUTPUT_FILE_PATH = Path(__file__).resolve().parent / 'data' / 'output_file'
 

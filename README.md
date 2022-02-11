@@ -7,6 +7,8 @@ for more.
 
 In short, rp2bionsensor converts the output of [RetroPath2.0](https://www.myexperiment.org/workflows/4987.html) into a HTML page showing the possible metabolic paths linking the compound to be detected to the detectable ones.
 
+Notice: only the shortest paths are kept. This mean that if there is a 1 step path, no 2 steps will be outputted.
+
 ## Install
 
 ```bash
@@ -46,7 +48,7 @@ optional arguments:
 ## Example
 
 ```bash
-python -m rp2biosensor tests/data/input/rp2-results_dmax-16.csv --opath ./biosensor.html
+python -m rp2biosensor tests/data/input/rp2-results_lactate.csv --opath ./biosensor.html
 ```
 
 ## For developpers
@@ -62,6 +64,8 @@ conda develop -n rp2biosensor-dev .
 python -m pytest -vv
 ```
 
-## Licence
+## Authors
+- Thomas Duigou ([tduigou](https://github.com/tduigou))
 
+## Licence
 rp2biosensor is released under the MIT licence. See the [LICENSE.md](LICENSE.md) file for details.
