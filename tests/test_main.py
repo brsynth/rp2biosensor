@@ -12,7 +12,8 @@ def test_dir_output(tmpdir):
     options = {
         'rp2_results': f'{INPUT_PATH}',
         'opath': f'{temp_path}',
-        'otype': 'dir'
+        'otype': 'dir',
+        'ojson': None
         }
     files_to_cmp = [
         'index.html',
@@ -36,7 +37,9 @@ def test_file_output(tmpdir):
     options = {
         'rp2_results': f'{INPUT_PATH}',
         'opath': f'{temp_path / "biosensor.html"}',
-        'otype': 'file'}
+        'otype': 'file',
+        'ojson': None
+        }
     files_to_cmp = ['biosensor.html']
     args = SimpleNamespace(**options)
     run(args)

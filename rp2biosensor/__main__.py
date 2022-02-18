@@ -49,8 +49,7 @@ def build_args_parser(prog='rp2biosensor'):
                         default='file', choices=['dir', 'file'])
     parser.add_argument("--ojson",
                         help="Output the graph as json file if the path is not None. "
-                             " Default: None",
-                        default=None)
+                             "Default: None")
     return parser
 
 
