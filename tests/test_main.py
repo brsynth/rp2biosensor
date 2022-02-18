@@ -36,7 +36,6 @@ def test_file_output(tmpdir):
     options = {
         'rp2_results': f'{INPUT_PATH}',
         'opath': f'{temp_path / "biosensor.html"}',
-        # 'opath': 'toto/biosensor.html',
         'otype': 'file'}
     files_to_cmp = ['biosensor.html']
     args = SimpleNamespace(**options)
