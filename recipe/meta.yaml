@@ -1,5 +1,5 @@
 {% set name = "rp2biosensor" %}
-{% set version = "2.0.0" %}
+{% set version = "2.0.1" %}
 
 package:
   name: {{ name|lower }}
@@ -15,10 +15,10 @@ build:
 
 requirements:
   host:
-    - python >=3.6
+    - python
     - pip
   run:
-    - python >=3.6
+    - python
     - networkx
     - rdkit
     - pytest
