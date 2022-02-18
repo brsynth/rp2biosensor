@@ -9,7 +9,7 @@ from pathlib import Path
 
 from rp2biosensor.RP2Objects import RP2parser
 from rp2biosensor.RP2Objects import RetroGraph
-from rp2biosensor.Utils import write
+from rp2biosensor.Utils import write, write_json
 
 # Path to templates 
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
@@ -47,6 +47,10 @@ def build_args_parser(prog='rp2biosensor'):
                              '"file" which means that all files will be embedded into '
                              'a single HTML page. Default: file',
                         default='file', choices=['dir', 'file'])
+    parser.add_argument("--ojson",
+                        help="Output the graph as json file if the path is not None. "
+                             " Default: None",
+                        default=None)
     return parser
 
 
@@ -58,6 +62,8 @@ def run(args):
     rgraph.refine()
     # Write output
     json_str = rgraph.to_cytoscape_export()
+    if args.ojson is not None:
+        write_json(Path(args.ojson), json_str)
     write(args, TEMPLATE_DIR, json_str)
 
 

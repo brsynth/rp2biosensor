@@ -3,6 +3,11 @@ from distutils import dir_util
 from tempfile import TemporaryDirectory
 
 
+def write_json(json_path, json_str):
+    with open(json_path, "w", newline="\n") as ofh:
+        ofh.write(json_str)
+
+
 def write(args, template_dir, json_str: str):
     if args.otype == 'dir':
         # Prepare output dir
