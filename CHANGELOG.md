@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0 (2022-02-24)
+- feat: update the default list of ignored compounds
+- feat: export graph as json
+
 ## 2.0.0 (2022-02-11)
 - feat: add co-substrates and co-products
 - feat: SMILES of compounds are canonized
@@ -7,7 +11,6 @@
 - feat: relax inchi search for compound to ignore
 - fix!: change default directionnality of reactions
 - fix: handle multiple usage of a same rule
-
 
 ## 1.0.1 (2021-12-20)
 - fix endline for windows files
