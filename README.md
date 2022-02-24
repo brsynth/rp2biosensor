@@ -31,7 +31,7 @@ The embedded help:
 ```bash
 python -m rp2biosensor -h
 
-usage: rp2biosensor [-h] [--opath OPATH] [--otype {dir,file}] rp2_results
+usage: rp2biosensor [-h] [--opath OPATH] [--otype {dir,file}] [--ojson OJSON] rp2_results
 
 Generate HTML outputs to explore Sensing Enabling Metabolic Pathway from RetroPath2 results.
 
@@ -40,9 +40,12 @@ positional arguments:
 
 optional arguments:
   -h, --help          show this help message and exit
-  --opath OPATH       Output path. Default: /Users/tduigou/code/rp2net/biosensor.html.
-  --otype {dir,file}  Output type. This could be either (i) "dir" which means ouput files will outputted into this directory, or (ii) "file" which means that all files will be embedded into a single HTML page. Default:
-                      file
+  --opath OPATH       Output path. Default: /Users/tduigou/code/rp2biosensor/biosensor.html.
+  --otype {dir,file}  Output type. This could be either (i) "dir" which means ouput files will
+                      outputted into this directory, or (ii) "file" which means that all files
+                      will be embedded into a single HTML
+                      page. Default: file
+  --ojson OJSON       Output the graph as json file if the path is not None. Default: None
 ```
 
 ## Example
