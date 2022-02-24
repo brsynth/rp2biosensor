@@ -3,7 +3,7 @@ from distutils import dir_util
 from tempfile import TemporaryDirectory
 
 
-def write_json(json_path, json_str):
+def __write_json(json_path, json_str):
     with open(json_path, "w", newline="\n") as ofh:
         ofh.write(json_str)
 
@@ -34,6 +34,9 @@ def write(args, template_dir, json_str: str):
             ofh.write(html_str.replace(b'\r\n', b'\n'))
     else:
         raise NotImplementedError(f'Unexpected otype: {args.otype}')
+
+    if args.ojson is not None:
+        __write_json(Path(args.ojson), json_str)
 
 
 def all_in_one_file(ifolder: Path) -> str:

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from rp2biosensor.RP2Objects import RP2parser
 from rp2biosensor.RP2Objects import RetroGraph
-from rp2biosensor.Utils import write, write_json
+from rp2biosensor.Utils import write, __write_json
 
 # Path to templates 
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
@@ -61,8 +61,6 @@ def run(args):
     rgraph.refine()
     # Write output
     json_str = rgraph.to_cytoscape_export()
-    if args.ojson is not None:
-        write_json(Path(args.ojson), json_str)
     write(args, TEMPLATE_DIR, json_str)
 
 
