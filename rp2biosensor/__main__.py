@@ -35,6 +35,8 @@ def build_args_parser(prog='rp2biosensor'):
     parser = argparse.ArgumentParser(description=desc, prog=prog)
     parser.add_argument('rp2_results',
                         help='RetroPath2.0 results')
+    parser.add_argument("sink_file",
+                        help="Sink file used for RetroPath2.0")
     # parser.add_argument('--reverse_direction',
     #                     help='Reverse direction of reactions described in RetroPath2.0 results.',
     #                     default=False, type=lambda x: (str(x).lower() == 'true'))
@@ -55,7 +57,7 @@ def build_args_parser(prog='rp2biosensor'):
 
 def run(args):
     # Extract and build graph
-    rparser = RP2parser(args.rp2_results)
+    rparser = RP2parser(args.rp2_results, args.sink_file)
     rgraph = RetroGraph(rparser.compounds, rparser.transformations)
     nb_paths = rgraph.keep_source_to_sink(to_skip=COFACTORS, target_id=TARGET_ID)
     rgraph.refine()

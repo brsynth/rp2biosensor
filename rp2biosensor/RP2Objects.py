@@ -544,7 +544,8 @@ class RP2parser:
 
     def __init__(
         self,
-        infile: str,
+        res_file: str,
+        sink_file: str,
         cmpdfile: str='compounds.csv',
         rxnfile: str='reactions.csv',
         sinkfile: str='sinks.csv',
@@ -554,8 +555,10 @@ class RP2parser:
 
         Parameters
         ----------
-        infile : str
+        res_file : str
             file path to RetroPath2.0 results
+        sink_file : str
+            file path to the sink file used by RetroPath2.0
         cmpdfile : str, optional
             compound file name to be outputted, by default 'compounds.csv'
         rxnfile : str, optional
@@ -574,9 +577,9 @@ class RP2parser:
         # Some implementation trick
         Compound.init_id_handler()
 
-        # Get content
+        # Get results content
         content = dict()
-        with open(infile, 'r') as fh:
+        with open(res_file, 'r') as fh:
             reader = csv.DictReader(fh)
             for row in reader:
                 # Skip if we are in a "header"
@@ -632,21 +635,8 @@ class RP2parser:
                     cmpd.compute_structures(smiles=False)
                     compounds[cmpd.uid] = cmpd
                     smiles_to_compound[can_smi] = cmpd.uid
-
-        # 3) Annotate sink
-        for tid, rows in content.items():
-            for row in rows:
-                if row['In Sink'] == '1':
-                    cids = row['Sink name'].lstrip('[').rstrip(']').split(', ')
-                    smi = row['Product SMILES']
-                    can_smi = canonize_smiles(smi)
-                    uid = smiles_to_compound[can_smi]
-                    cmpd = compounds[uid]
-                    for cid in cids:
-                        compounds[cmpd.uid].add_cid(cid)
-                    compounds[cmpd.uid].set_is_sink(True)
-
-        # 4) Annotate target
+        
+        # 3) Annotate target
         target_ids_handler = IDsHandler(length=10, prefix='TARGET')
         target_visited = set()
         for tid, rows in content.items():
@@ -662,22 +652,56 @@ class RP2parser:
                     cmpd.set_uid(target_uid)
                     cmpd.set_is_target(True)
                     compounds[target_uid] = cmpd
-        
-        # 5) Make accessible compounds and cache information from Transformation objects
+
+        # 4) Make accessible compounds and cache information from Transformation objects
         Transformation.set_compounds(compounds, smiles_to_compound)
         Transformation.set_cache()
 
-        # 6) Populate transformations
+        # 5) Populate transformations
         transformations = dict()
         for tid, rows in content.items():
             trs = Transformation(rows[0])
             # Complete transformatoins
             completed_transformations = Transformation.complete_reactions(trs)
             transformations.update(completed_transformations)
-        
-        # # DEBUG
-        # for cid, cmpd in compounds.items():
-        #     print(f"UID:  {cmpd.uid} -- {cmpd.smiles}")
+
+        # 6) Annotate sink
+        # At first, deduce sink compounds from the annotations
+        #    in the result file
+        for tid, rows in content.items():
+            for row in rows:
+                if row['In Sink'] == '1':
+                    cids = row['Sink name'].lstrip('[').rstrip(']').split(', ')
+                    smi = row['Product SMILES']
+                    can_smi = canonize_smiles(smi)
+                    uid = smiles_to_compound[can_smi]
+                    cmpd = compounds[uid]
+                    for cid in cids:
+                        compounds[cmpd.uid].add_cid(cid)
+                    compounds[cmpd.uid].set_is_sink(True)
+        # Because a result can have no "sink" annotation
+        #    we also directly extract sink information from
+        #    sink file
+        # But, we still want to keep the part above, 
+        #    because the matching criteria (SMILES vs inchi)
+        #    are different. Belt AND suspenders...
+        sinks = {}
+        with open(sink_file) as fh:
+            # We don't use dictreader because labels
+            #    "name" and "inchi" can be upper, lower, 
+            #    or mixed case. Index is more simple.
+            #    row[0] is the compound name
+            #    row[1] is the inchi
+            reader = csv.reader(fh)
+            for row in reader:
+                # Skip the header
+                if row[0].lower().startswith("name"):
+                    continue
+                name, inchi = row[0], row[1]
+                for cid, cmpd in compounds.items():
+                    if cmpd.inchi == inchi:
+                        cmpd.add_cid(name)
+                        cmpd.set_is_sink(True)
 
         # Store compounds and transformations
         self.compounds = compounds
