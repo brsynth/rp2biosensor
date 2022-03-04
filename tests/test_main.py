@@ -3,17 +3,19 @@ from pathlib import Path
 from filecmp import cmpfiles
 from rp2biosensor.__main__ import run
 
-INPUT_PATH = Path(__file__).resolve().parent/ 'data' / 'input' / 'rp2-results-lactate.csv'
+RESULT_PATH = Path(__file__).resolve().parent/ 'data' / 'input' / 'rp2-results-lactate.csv'
+SINK_PATH = Path(__file__).resolve().parent / 'data' / 'input' / 'sink-h2o2.csv'
 OUTPUT_DIR_PATH = Path(__file__).resolve().parent / 'data' / 'output_dir'
 OUTPUT_FILE_PATH = Path(__file__).resolve().parent / 'data' / 'output_file'
 
 def test_dir_output(tmpdir):
     temp_path = tmpdir / 'dir_case'  # tmpdir scope is session wised
     options = {
-        'rp2_results': f'{INPUT_PATH}',
-        'opath': f'{temp_path}',
-        'otype': 'dir',
-        'ojson': None
+        "rp2_results": f"{RESULT_PATH}",
+        "sink_file": f"{SINK_PATH}",
+        "opath": f"{temp_path}",
+        "otype": "dir",
+        "ojson": None
         }
     files_to_cmp = [
         'index.html',
@@ -35,10 +37,11 @@ def test_dir_output(tmpdir):
 def test_file_output(tmpdir):
     temp_path = tmpdir / 'file_case'  # tmpdir scope is session wised
     options = {
-        'rp2_results': f'{INPUT_PATH}',
-        'opath': f'{temp_path / "biosensor.html"}',
-        'otype': 'file',
-        'ojson': None
+        "rp2_results": f"{RESULT_PATH}",
+        "sink_file": f"{SINK_PATH}",
+        "opath": f'{temp_path / "biosensor.html"}',
+        "otype": "file",
+        "ojson": None
         }
     files_to_cmp = ['biosensor.html']
     args = SimpleNamespace(**options)
