@@ -37,6 +37,7 @@ Generate HTML outputs to explore Sensing Enabling Metabolic Pathway from RetroPa
 
 positional arguments:
   rp2_results         RetroPath2.0 results
+  sink_file           Sink file used for RetroPath2.0
 
 optional arguments:
   -h, --help          show this help message and exit
