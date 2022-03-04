@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.0.0 (2022-03-04)
+- fix(RP2Objects)!: sink matching issue
+
 ## 2.1.0 (2022-02-24)
 - feat: update the default list of ignored compounds
 - feat: export graph as json
