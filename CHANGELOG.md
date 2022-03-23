@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.1.0 (2022-03-23)
+- fix(RP2Objects): adapt to rxn_rebuild output structure changes
+
 ## 3.0.0 (2022-03-04)
 - fix(RP2Objects)!: sink matching issue
 
