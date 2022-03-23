@@ -15,6 +15,7 @@ import json
 import logging
 import sys
 import urllib
+from math import ceil
 
 import networkx as nx
 from rdkit import Chem
@@ -318,14 +319,9 @@ class Transformation(object):
         list
             List of completed Transformations.
         """
-        def cids_in_side(side_str: str) -> dict:
-            items = {}
-            for cid in side_str.split('+'):
-                if cid not in items:
-                    items[cid] = 0
-                items[cid] += 1
-            return items
-        
+        def sanitize_coeff(coeff):
+            return ceil(coeff)
+
         cache = cls.cache
         cache_helper = CacheHelper(cls.cache)
 
@@ -375,9 +371,14 @@ class Transformation(object):
                     cache=cache)
 
                 # Parse the list of left and right compound IDs
-                left_str, right_str = rxn_info[tmpl_rxn_id]['full_transfo'].split('=')
-                trs_child.left_uids = cids_in_side(left_str)
-                trs_child.right_uids = cids_in_side(right_str)
+                trs_child.left_uids = rxn_info[tmpl_rxn_id]['full_transfo']['left']
+                trs_child.right_uids = rxn_info[tmpl_rxn_id]['full_transfo']['right']
+                
+                # Sanitize coeff (could be float, we want integer)
+                for cid in trs_child.left_uids:
+                    trs_child.left_uids[cid] = sanitize_coeff(trs_child.left_uids[cid])
+                for cid in trs_child.right_uids:
+                    trs_child.right_uids[cid] = sanitize_coeff(trs_child.right_uids[cid])
 
                 # DEBUG
                 left_uids_debug = trs_child.left_uids
