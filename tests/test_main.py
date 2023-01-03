@@ -26,8 +26,8 @@ def compare_files(ref_dir: Path, test_dir: Path, files_to_cmp: list):
     match = []
     mismatch = []
     for file in files_to_cmp:
-        with open(ref_dir / file) as ref, \
-             open(test_dir / file) as test:
+        with open(ref_dir / file, encoding="utf-8") as ref, \
+             open(test_dir / file, encoding="utf-8") as test:
             f1 = filter(filter_lines, ref)
             f2 = filter(filter_lines, test)
             if all(x == y for x,y in zip(f1, f2)):
