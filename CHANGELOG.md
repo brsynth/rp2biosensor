@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.1 (2023-01-03)
+
+- fix(test_main.py): fix UnicodeDecodeError with windows OS
+
 ## 3.2.0 (2023-01-03)
 
 - feat: add cache_dir arg
