@@ -44,7 +44,8 @@ def test_dir_output(tmpdir):
         "sink_file": f"{SINK_PATH}",
         "opath": f"{temp_path}",
         "otype": "dir",
-        "ojson": None
+        "ojson": None,
+        "cache_dir": None
         }
     files_to_cmp = [
         'index.html',
@@ -75,7 +76,8 @@ def test_file_output(tmpdir):
         "sink_file": f"{SINK_PATH}",
         "opath": f'{temp_path / "biosensor.html"}',
         "otype": "file",
-        "ojson": None
+        "ojson": None,
+        "cache_dir": None
         }
     files_to_cmp = ['biosensor.html']
     args = SimpleNamespace(**options)

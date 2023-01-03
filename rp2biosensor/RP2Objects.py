@@ -15,6 +15,7 @@ import json
 import logging
 import sys
 import urllib
+import os
 from math import ceil
 
 import networkx as nx
@@ -277,9 +278,9 @@ class Transformation(object):
         cls.smiles_to_compound = smiles_to_compound
 
     @classmethod
-    def set_cache(cls) -> None:
+    def set_cache(cls, cache_dir: str) -> None:
         """Set up the cache to be used for completing the reactions"""
-        cls.cache = rrCache()
+        cls.cache = rrCache(cache_dir=cache_dir)
 
     @classmethod
     def cmpd_to_str(cls, uid: str, coeff: int) -> str:
@@ -550,7 +551,8 @@ class RP2parser:
         cmpdfile: str='compounds.csv',
         rxnfile: str='reactions.csv',
         sinkfile: str='sinks.csv',
-        reverse: bool=False
+        reverse: bool=False,
+        cache_dir: str=os.getcwd()
         ):
         """Parse the output from RetroPath2.0
 
@@ -568,6 +570,9 @@ class RP2parser:
             sink file named to be outputted, by default 'sinks.csv'
         reverse : bool, optional
             should we consider the reaction in the reverse direction, by default False
+        cache_dir : str, optional
+            dir path for storing rrCache files
+
         """
 
         # Store
@@ -656,7 +661,7 @@ class RP2parser:
 
         # 4) Make accessible compounds and cache information from Transformation objects
         Transformation.set_compounds(compounds, smiles_to_compound)
-        Transformation.set_cache()
+        Transformation.set_cache(cache_dir=cache_dir)
 
         # 5) Populate transformations
         transformations = dict()

@@ -52,12 +52,16 @@ def build_args_parser(prog='rp2biosensor'):
     parser.add_argument("--ojson",
                         help="Output the graph as json file if the path is not None. "
                              "Default: None")
+    parser.add_argument("--cache-dir",
+                        help="Path to the cache directory. If not specified, "
+                             "None is passed to rrCache.",
+                        default=None)
     return parser
 
 
 def run(args):
     # Extract and build graph
-    rparser = RP2parser(args.rp2_results, args.sink_file)
+    rparser = RP2parser(args.rp2_results, args.sink_file, cache_dir=args.cache_dir)
     rgraph = RetroGraph(rparser.compounds, rparser.transformations)
     nb_paths = rgraph.keep_source_to_sink(to_skip=COFACTORS, target_id=TARGET_ID)
     rgraph.refine()
