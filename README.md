@@ -31,22 +31,21 @@ The embedded help:
 ```bash
 python -m rp2biosensor -h
 
-usage: rp2biosensor [-h] [--opath OPATH] [--otype {dir,file}] [--ojson OJSON] rp2_results
+usage: rp2biosensor [-h] [--opath OPATH] [--otype {dir,file}] [--ojson OJSON] [--cache-dir CACHE_DIR] rp2_results sink_file
 
 Generate HTML outputs to explore Sensing Enabling Metabolic Pathway from RetroPath2 results.
 
 positional arguments:
-  rp2_results         RetroPath2.0 results
-  sink_file           Sink file used for RetroPath2.0
+  rp2_results           RetroPath2.0 results
+  sink_file             Sink file used for RetroPath2.0
 
-optional arguments:
-  -h, --help          show this help message and exit
-  --opath OPATH       Output path. Default: /Users/tduigou/code/rp2biosensor/biosensor.html.
-  --otype {dir,file}  Output type. This could be either (i) "dir" which means ouput files will
-                      outputted into this directory, or (ii) "file" which means that all files
-                      will be embedded into a single HTML
-                      page. Default: file
-  --ojson OJSON       Output the graph as json file if the path is not None. Default: None
+options:
+  -h, --help            show this help message and exit
+  --opath OPATH         Output path. Default: /Users/tduigou/code/rp2biosensor/biosensor.html.
+  --otype {dir,file}    Output type. This could be either (i) "dir" which means ouput files will outputted into this directory, or (ii) "file" which means that all files will be embedded into a single HTML page. Default: file
+  --ojson OJSON         Output the graph as json file if the path is not None. Default: None
+  --cache-dir CACHE_DIR
+                        Path to the cache directory. If not specified, None is passed to rrCache.
 ```
 
 ## Example
